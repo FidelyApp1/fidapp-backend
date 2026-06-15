@@ -10,8 +10,8 @@ const generateQrCode = async (req, res) => {
       data: { restaurantId, code: uuidv4() }
     })
 
-    // Changement pour l'URL de production Vercel
-    const scanUrl = `https://fidapp-client-production.vercel.app/scan/${qrCode.code}`
+    // URL mise à jour pour la production Vercel
+    const scanUrl = `https://fidapp-client.vercel.app/scan/${qrCode.code}`
     const qrImageBase64 = await QRCode.toDataURL(scanUrl, {
       width: 400,
       margin: 2,
@@ -40,8 +40,8 @@ const getMyQrCodes = async (req, res) => {
 
     const qrCodesWithImages = await Promise.all(
       qrCodes.map(async (qr) => {
-        // Changement pour l'URL de production Vercel également ici
-        const scanUrl = `https://fidapp-client-production.vercel.app/scan/${qr.code}`
+        // URL mise à jour également ici pour l'historique des codes
+        const scanUrl = `https://fidapp-client.vercel.app/scan/${qr.code}`
         const qrImage = await QRCode.toDataURL(scanUrl, {
           width: 400,
           margin: 2,
