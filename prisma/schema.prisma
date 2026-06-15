@@ -9,15 +9,17 @@ datasource db {
 }
 
 model Restaurant {
-  id         String   @id @default(uuid())
-  name       String
-  email      String   @unique
-  password   String
-  phone      String?
-  address    String?
-  logoUrl    String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id             String   @id @default(uuid())
+  name           String
+  email          String   @unique
+  password       String
+  phone          String?
+  address        String?
+  logoUrl        String?
+  checksRequired Int      @default(10)
+  suspended      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   loyaltyCards LoyaltyCard[]
   qrCodes      QrCode[]
@@ -76,4 +78,11 @@ model QrCode {
   createdAt    DateTime   @default(now())
 
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+}
+
+model Admin {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
 }

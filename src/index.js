@@ -6,6 +6,7 @@ const authRoutes = require('./routes/auth.routes')
 const checkinRoutes = require('./routes/checkin.routes')
 const qrcodeRoutes = require('./routes/qrcode.routes')
 const statsRoutes = require('./routes/stats.routes')
+const adminRoutes = require('./routes/admin.routes')
 
 const app = express()
 
@@ -28,6 +29,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/checkin', checkinRoutes)
 app.use('/api/qrcode', qrcodeRoutes)
 app.use('/api/stats', statsRoutes)
+app.use('/api/admin', adminRoutes)
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
