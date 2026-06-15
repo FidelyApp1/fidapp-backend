@@ -13,8 +13,8 @@ app.use(cors({
   origin: [
     'http://localhost:5173',
     'http://localhost:5174',
-    'http://192.168.11.111:5173',
-    'http://192.168.11.111:5174'
+    'https://fidapp-client-production.vercel.app',
+    'https://fidapp-dashboard-production.vercel.app'
   ],
   credentials: true
 }))
