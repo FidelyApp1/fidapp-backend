@@ -7,6 +7,7 @@ const checkinRoutes = require('./routes/checkin.routes')
 const qrcodeRoutes = require('./routes/qrcode.routes')
 const statsRoutes = require('./routes/stats.routes')
 const adminRoutes = require('./routes/admin.routes')
+const clientRoutes = require('./routes/client.routes')
 
 const app = express()
 
@@ -26,6 +27,7 @@ app.get('/', (req, res) => {
   res.json({ message: 'FidApp API is running 🚀' })
 })
 
+app.use('/api/client', clientRoutes)
 app.use('/api/auth', authRoutes)
 app.use('/api/checkin', checkinRoutes)
 app.use('/api/qrcode', qrcodeRoutes)
