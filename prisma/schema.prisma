@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Restaurant {
+  id         String   @id @default(uuid())
+  name       String
+  email      String   @unique
+  password   String
+  phone      String?
+  address    String?
+  logoUrl    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  loyaltyCards LoyaltyCard[]
+  qrCodes      QrCode[]
+}
+
+model User {
+  id        String   @id @default(uuid())
+  phone     String   @unique
+  email     String?
+  name      String?
+  createdAt DateTime @default(now())
+
+  loyaltyCards LoyaltyCard[]
+}
+
+model LoyaltyCard {
+  id           String     @id @default(uuid())
+  userId       String
+  restaurantId String
+  checkCount   Int        @default(0)
+  totalChecks  Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  user         User       @relation(fields: [userId], references: [id])
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  checkins     Checkin[]
+  rewards      Reward[]
+
+  @@unique([userId, restaurantId])
+}
+
+model Checkin {
+  id            String      @id @default(uuid())
+  loyaltyCardId String
+  createdAt     DateTime    @default(now())
+
+  loyaltyCard   LoyaltyCard @relation(fields: [loyaltyCardId], references: [id])
+}
+
+model Reward {
+  id            String      @id @default(uuid())
+  loyaltyCardId String
+  type          String
+  description   String?
+  redeemedAt    DateTime?
+  createdAt     DateTime    @default(now())
+
+  loyaltyCard   LoyaltyCard @relation(fields: [loyaltyCardId], references: [id])
+}
+
+model QrCode {
+  id           String     @id @default(uuid())
+  restaurantId String
+  code         String     @unique @default(uuid())
+  createdAt    DateTime   @default(now())
+
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+}
