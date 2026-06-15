@@ -31,6 +31,30 @@ const checkin = async (req, res) => {
       })
     }
 
+    // 🛡️ Anti-fraude — 1 check-in par tranche de 4h
+    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000)
+    const recentCheckin = await prisma.checkin.findFirst({
+      where: {
+        loyaltyCardId: card.id,
+        createdAt: { gte: fourHoursAgo }
+      }
+    })
+
+    if (recentCheckin) {
+      const nextCheckin = new Date(recentCheckin.createdAt.getTime() + 4 * 60 * 60 * 1000)
+      
+      // Sécurité : Math.max(1, ...) pour éviter le "0min" si l'utilisateur tente à la dernière seconde
+      const diff = Math.max(1, Math.ceil((nextCheckin - Date.now()) / (1000 * 60)))
+      
+      const heures = Math.floor(diff / 60)
+      const minutes = diff % 60
+      
+      return res.status(429).json({
+        error: 'anti_fraud',
+        message: `Prochain check-in disponible dans ${heures > 0 ? heures + 'h' : ''}${minutes}min`
+      })
+    }
+
     // Créer le check-in
     await prisma.checkin.create({ data: { loyaltyCardId: card.id } })
 
