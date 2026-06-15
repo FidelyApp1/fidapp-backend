@@ -69,7 +69,7 @@ const checkin = async (req, res) => {
 
     // Vérifier si reward atteint (10 check-ins)
     let reward = null
-    if (updatedCard.checkCount >= 10) {
+    if (updatedCard.checkCount >= qr.restaurant.checksRequired) {
       reward = await prisma.reward.create({
         data: {
           loyaltyCardId: card.id,
@@ -89,8 +89,9 @@ const checkin = async (req, res) => {
       success: true,
       restaurant: qr.restaurant.name,
       checkCount: reward ? 0 : updatedCard.checkCount,
+      checksRequired: qr.restaurant.checksRequired,
       reward: reward ? reward.description : null,
-      message: reward ? '🎉 Félicitations ! Vous avez gagné un repas gratuit !' : `Check-in #${updatedCard.checkCount}/10`
+      message: reward ? '🎉 Félicitations ! Vous avez gagné un repas gratuit !' : `Check-in #${updatedCard.checkCount}/${qr.restaurant.checksRequired}`
     })
   } catch (err) {
     res.status(500).json({ error: 'Erreur serveur', detail: err.message })
