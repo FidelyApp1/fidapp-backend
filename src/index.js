@@ -15,7 +15,8 @@ app.use(cors({
     'http://localhost:5173',
     'http://localhost:5174',
     'https://fidapp-client.vercel.app',
-    'https://fidapp-dashboard.vercel.app'
+    'https://fidapp-dashboard.vercel.app',
+    'https://fidapp-admin.vercel.app'
   ],
   credentials: true
 }))
