@@ -89,27 +89,37 @@ const deleteRestaurant = async (req, res) => {
 }
 
 const getRestaurantStats = async (req, res) => {
-  const { id } = req.params
-  try {
-    const restaurant = await prisma.restaurant.findUnique({
-      where: { id },
-      include: {
-        _count: { select: { loyaltyCards: true, qrCodes: true } }
-      }
-    })
-
-    const totalCheckins = await prisma.checkin.count({
-      where: { loyaltyCard: { restaurantId: id } }
-    })
-
-    const totalRewards = await prisma.reward.count({
-      where: { loyaltyCard: { restaurantId: id } }
-    })
-
-    res.json({ restaurant, totalCheckins, totalRewards })
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur serveur', detail: err.message })
+    const { id } = req.params
+    try {
+      const restaurant = await prisma.restaurant.findUnique({
+        where: { id },
+        include: {
+          _count: { select: { loyaltyCards: true, qrCodes: true } }
+        }
+      })
+  
+      const totalCheckins = await prisma.checkin.count({
+        where: { loyaltyCard: { restaurantId: id } }
+      })
+  
+      const totalRewards = await prisma.reward.count({
+        where: { loyaltyCard: { restaurantId: id } }
+      })
+  
+      const recentCheckins = await prisma.checkin.findMany({
+        where: { loyaltyCard: { restaurantId: id } },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        include: {
+          loyaltyCard: {
+            include: { user: true }
+          }
+        }
+      })
+  
+      res.json({ restaurant, totalCheckins, totalRewards, recentCheckins })
+    } catch (err) {
+      res.status(500).json({ error: 'Erreur serveur', detail: err.message })
+    }
   }
-}
-
 module.exports = { adminLogin, getRestaurants, createRestaurant, updateRestaurant, deleteRestaurant, getRestaurantStats }
