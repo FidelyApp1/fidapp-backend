@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const prisma = require('../lib/prisma')
 
+// 1️⃣ Inscription d'un nouveau restaurant
 const register = async (req, res) => {
   const { name, email, password, phone, address } = req.body
 
@@ -23,34 +24,16 @@ const register = async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN }
     )
 
-    res.status(201).json({ token, restaurant: { id: restaurant.id, name: restaurant.name, email: restaurant.email } })
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur serveur', detail: err.message })
-  }
-}
-const getMe = async (req, res) => {
-  try {
-    const restaurant = await prisma.restaurant.findUnique({
-      where: { id: req.restaurantId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        address: true,
-        checksRequired: true,
-        suspended: true,
-        createdAt: true
-      }
+    res.status(201).json({ 
+      token, 
+      restaurant: { id: restaurant.id, name: restaurant.name, email: restaurant.email } 
     })
-    if (!restaurant) return res.status(404).json({ error: 'Restaurant introuvable' })
-    res.json({ restaurant })
   } catch (err) {
     res.status(500).json({ error: 'Erreur serveur', detail: err.message })
   }
 }
 
-module.exports = { register, login, getMe }
+// 2️⃣ Connexion d'un restaurant
 const login = async (req, res) => {
   const { email, password } = req.body
 
@@ -71,10 +54,39 @@ const login = async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN }
     )
 
-    res.json({ token, restaurant: { id: restaurant.id, name: restaurant.name, email: restaurant.email } })
+    res.json({ 
+      token, 
+      restaurant: { id: restaurant.id, name: restaurant.name, email: restaurant.email } 
+    })
   } catch (err) {
     res.status(500).json({ error: 'Erreur serveur', detail: err.message })
   }
 }
 
-module.exports = { register, login }
+// 3️⃣ Récupération du profil connecté (avec statut de suspension et configuration locale)
+const getMe = async (req, res) => {
+  try {
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { id: req.restaurantId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        address: true,
+        checksRequired: true,
+        suspended: true,
+        createdAt: true
+      }
+    })
+    
+    if (!restaurant) return res.status(404).json({ error: 'Restaurant introuvable' })
+    
+    res.json({ restaurant })
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur serveur', detail: err.message })
+  }
+}
+
+// Un seul export propre en fin de fichier
+module.exports = { register, login, getMe }
