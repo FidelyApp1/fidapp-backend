@@ -28,7 +28,29 @@ const register = async (req, res) => {
     res.status(500).json({ error: 'Erreur serveur', detail: err.message })
   }
 }
+const getMe = async (req, res) => {
+  try {
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { id: req.restaurantId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        address: true,
+        checksRequired: true,
+        suspended: true,
+        createdAt: true
+      }
+    })
+    if (!restaurant) return res.status(404).json({ error: 'Restaurant introuvable' })
+    res.json({ restaurant })
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur serveur', detail: err.message })
+  }
+}
 
+module.exports = { register, login, getMe }
 const login = async (req, res) => {
   const { email, password } = req.body
 

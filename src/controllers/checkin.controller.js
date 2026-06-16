@@ -2,7 +2,8 @@ const prisma = require('../lib/prisma')
 const jwt = require('jsonwebtoken')
 
 const checkin = async (req, res) => {
-  const { phone, qrCode } = req.body
+  // 📥 Récupération du prénom aux côtés des autres données du body
+  const { phone, qrCode, name } = req.body
 
   try {
     // Vérifier le QR token JWT
@@ -12,7 +13,7 @@ const checkin = async (req, res) => {
     } catch (err) {
       return res.status(401).json({
         error: 'qr_expired',
-        message: 'QR code expiré — demandez au restaurant d\'afficher le nouveau QR code'
+        message: "QR code expiré — demandez au restaurant d'afficher le nouveau QR code"
       })
     }
 
@@ -34,9 +35,15 @@ const checkin = async (req, res) => {
       return res.status(403).json({ error: 'Ce restaurant est suspendu' })
     }
 
+    // 👤 Gestion de l'utilisateur avec prise en compte du prénom (name)
     let user = await prisma.user.findUnique({ where: { phone } })
+    
     if (!user) {
-      user = await prisma.user.create({ data: { phone } })
+      // Inscription : s'il n'existe pas, on l'enregistre avec son prénom s'il est fourni
+      user = await prisma.user.create({ data: { phone, name: name || null } })
+    } else if (name && !user.name) {
+      // Remplissage : s'il existait déjà mais sans prénom enregistré, on met à jour
+      user = await prisma.user.update({ where: { phone }, data: { name } })
     }
 
     let card = await prisma.loyaltyCard.findUnique({
@@ -101,7 +108,7 @@ const checkin = async (req, res) => {
       checksRequired: restaurant.checksRequired,
       reward: reward ? reward.description : null,
       message: reward
-        ? '🎉 Félicitations ! Vous avez gagné un repas gratuit !'
+        ? `🎉 Félicitations ${user.name || ''} ! Vous avez gagné un repas gratuit !`
         : `Check-in #${updatedCard.checkCount}/${restaurant.checksRequired}`
     })
   } catch (err) {
