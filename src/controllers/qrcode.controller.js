@@ -1,29 +1,42 @@
 const prisma = require('../lib/prisma')
 const { v4: uuidv4 } = require('uuid')
 const QRCode = require('qrcode')
+const jwt = require('jsonwebtoken')
+
+const generateQrToken = (restaurantId) => {
+  return jwt.sign(
+    { restaurantId, type: 'qr_checkin' },
+    process.env.JWT_SECRET,
+    { expiresIn: '1h' }
+  )
+}
+
+const generateQrImage = async (token) => {
+  const scanUrl = `https://fidapp-client.vercel.app/scan/${token}`
+  return await QRCode.toDataURL(scanUrl, {
+    width: 400,
+    margin: 2,
+    color: { dark: '#1a1a1a', light: '#ffffff' }
+  })
+}
 
 const generateQrCode = async (req, res) => {
   const restaurantId = req.restaurantId
 
   try {
-    const qrCode = await prisma.qrCode.create({
-      data: { restaurantId, code: uuidv4() }
-    })
-
-    // URL mise à jour pour la production Vercel
-    const scanUrl = `https://fidapp-client.vercel.app/scan/${qrCode.code}`
-    const qrImageBase64 = await QRCode.toDataURL(scanUrl, {
+    const token = generateQrToken(restaurantId)
+    const scanUrl = `https://fidapp-client.vercel.app/scan/${token}`
+    const qrImage = await QRCode.toDataURL(scanUrl, {
       width: 400,
       margin: 2,
       color: { dark: '#1a1a1a', light: '#ffffff' }
     })
 
-    res.json({
-      success: true,
-      qrCode: qrCode.code,
-      scanUrl,
-      qrImage: qrImageBase64
+    await prisma.qrCode.create({
+      data: { restaurantId, code: uuidv4(), isRotating: true }
     })
+
+    res.json({ success: true, token, scanUrl, qrImage })
   } catch (err) {
     res.status(500).json({ error: 'Erreur serveur', detail: err.message })
   }
@@ -33,25 +46,20 @@ const getMyQrCodes = async (req, res) => {
   const restaurantId = req.restaurantId
 
   try {
-    const qrCodes = await prisma.qrCode.findMany({
-      where: { restaurantId },
-      orderBy: { createdAt: 'desc' }
+    const token = generateQrToken(restaurantId)
+    const qrImage = await generateQrImage(token)
+
+    res.json({
+      qrCodes: [{
+        id: 'rotating',
+        code: token,
+        isRotating: true,
+        qrImage,
+        scanUrl: `https://fidapp-client.vercel.app/scan/${token}`,
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000)
+      }]
     })
-
-    const qrCodesWithImages = await Promise.all(
-      qrCodes.map(async (qr) => {
-        // URL mise à jour également ici pour l'historique des codes
-        const scanUrl = `https://fidapp-client.vercel.app/scan/${qr.code}`
-        const qrImage = await QRCode.toDataURL(scanUrl, {
-          width: 400,
-          margin: 2,
-          color: { dark: '#1a1a1a', light: '#ffffff' }
-        })
-        return { ...qr, scanUrl, qrImage }
-      })
-    )
-
-    res.json({ qrCodes: qrCodesWithImages })
   } catch (err) {
     res.status(500).json({ error: 'Erreur serveur', detail: err.message })
   }
