@@ -56,28 +56,30 @@ const checkin = async (req, res) => {
       })
     }
 
-    // Anti-fraude 4h
-    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000)
-    const recentCheckin = await prisma.checkin.findFirst({
+    // 🔒 Anti-fraude — 1 check-in par token QR unique pour ce client
+    const existingCheckin = await prisma.checkin.findFirst({
       where: {
         loyaltyCardId: card.id,
-        createdAt: { gte: fourHoursAgo }
+        qrToken: qrCode
       }
     })
 
-    if (recentCheckin) {
-      const nextCheckin = new Date(recentCheckin.createdAt.getTime() + 4 * 60 * 60 * 1000)
-      const diff = Math.ceil((nextCheckin - Date.now()) / (1000 * 60))
-      const heures = Math.floor(diff / 60)
-      const minutes = diff % 60
+    if (existingCheckin) {
       return res.status(429).json({
         error: 'anti_fraud',
-        message: `Prochain check-in disponible dans ${heures > 0 ? heures + 'h' : ''}${minutes}min`
+        message: 'Vous avez déjà scanné ce QR code. Attendez le prochain QR pour valider une nouvelle visite.'
       })
     }
 
-    await prisma.checkin.create({ data: { loyaltyCardId: card.id } })
+    // 🛒 Création du check-in avec enregistrement du jeton utilisé
+    await prisma.checkin.create({
+      data: { 
+        loyaltyCardId: card.id,
+        qrToken: qrCode
+      }
+    })
 
+    // Incrémentation de la carte de fidélité
     const updatedCard = await prisma.loyaltyCard.update({
       where: { id: card.id },
       data: {

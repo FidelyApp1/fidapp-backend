@@ -55,11 +55,14 @@ model LoyaltyCard {
 model Checkin {
   id            String      @id @default(uuid())
   loyaltyCardId String
+  qrToken       String?     // Parfait, pas de @unique ici pour permettre à plusieurs clients de l'utiliser
   createdAt     DateTime    @default(now())
 
-  loyaltyCard   LoyaltyCard @relation(fields: [loyaltyCardId], references: [id])
-}
+  loyaltyCard   LoyaltyCard @relation(fields: [loyaltyCardId], references: [id], onDelete: Cascade)
 
+  // ⚡ Ajoute juste ça pour accélérer tes requêtes de statistiques et de filtres
+  @@index([loyaltyCardId])
+}
 model Reward {
   id            String      @id @default(uuid())
   loyaltyCardId String
