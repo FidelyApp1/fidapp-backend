@@ -2,11 +2,11 @@ const prisma = require('../lib/prisma')
 const jwt = require('jsonwebtoken')
 
 const checkin = async (req, res) => {
-  // 📥 Récupération du numéro, du token QR et du prénom depuis le body
+  // 📥 Récupération des données envoyées par le smartphone du client
   const { phone, qrCode, name } = req.body
 
   try {
-    // 1️⃣ Vérifier le QR token JWT
+    // 1️⃣ Décoder et vérifier la validité du token JWT
     let decoded
     try {
       decoded = jwt.verify(qrCode, process.env.JWT_SECRET)
@@ -22,30 +22,29 @@ const checkin = async (req, res) => {
     }
 
     const restaurantId = decoded.restaurantId
-    const qrCodeId = decoded.qrCodeId // ⚡ Récupération de l'ID unique de la ligne Prisma
+    const qrCodeId = decoded.qrCodeId 
 
-    // 2️⃣ 🛡️ LOCK ANTI-FRAUDE GLOBAL (Screenshot / Partage WhatsApp)
-    // On va chercher le QR code généré en base de données pour vérifier son état
-    const qrRecord = await prisma.qrCode.findUnique({
-      where: { id: qrCodeId }
+    // 2️⃣ et 3️⃣ 🛡️ OPÉRATION ATOMIQUE ANTI-FRAUDE (Screenshot & Double Validation simultanée)
+    // On essaie de passer 'isUsed' à true SEULEMENT s'il était à false. 
+    // S'il a déjà été validé par quelqu'un d'autre, le count vaudra 0.
+    const updatedQr = await prisma.qrCode.updateMany({
+      where: {
+        id: qrCodeId,
+        isUsed: false
+      },
+      data: {
+        isUsed: true
+      }
     })
 
-    // S'il n'existe pas ou s'il a DÉJÀ été scanné par quelqu'un d'autre -> REJET IMMÉDIAT
-    if (!qrRecord || qrRecord.isUsed) {
+    if (updatedQr.count === 0) {
       return res.status(410).json({
         error: 'qr_already_used',
         message: "Ce QR code a déjà été validé ou est obsolète. Veuillez scanner le nouveau QR code sur l'écran du restaurant."
       })
     }
 
-    // 3️⃣ 🔒 INVALIDATION IMMÉDIATE : On marque le QR code comme consommé tout de suite
-    // pour bloquer les requêtes simultanées ou ultra-rapides.
-    await prisma.qrCode.update({
-      where: { id: qrCodeId },
-      data: { isUsed: true }
-    })
-
-    // 4️⃣ Vérifications du restaurant
+    // 4️⃣ Vérifications de l'état du restaurant
     const restaurant = await prisma.restaurant.findUnique({
       where: { id: restaurantId }
     })
@@ -58,18 +57,16 @@ const checkin = async (req, res) => {
       return res.status(403).json({ error: 'Ce restaurant est suspendu' })
     }
 
-    // 5️⃣ 👤 Gestion de l'utilisateur avec prise en compte du prénom (name)
+    // 5️⃣ 👤 Gestion du profil de l'utilisateur (Création ou Mise à jour du prénom)
     let user = await prisma.user.findUnique({ where: { phone } })
     
     if (!user) {
-      // Inscription
       user = await prisma.user.create({ data: { phone, name: name || null } })
     } else if (name && !user.name) {
-      // Remplissage si le prénom manquait
       user = await prisma.user.update({ where: { phone }, data: { name } })
     }
 
-    // 6️⃣ Gestion ou création de la carte de fidélité
+    // 6️⃣ Récupération ou création de la carte de fidélité pour ce restaurant
     let card = await prisma.loyaltyCard.findUnique({
       where: { userId_restaurantId: { userId: user.id, restaurantId } }
     })
@@ -80,14 +77,14 @@ const checkin = async (req, res) => {
       })
     }
 
-    // ⏱️ 7️⃣ LOCK ANTI-SPAM PAR CLIENT : Limite à 1 scan toutes les 6 heures
-    const LIMIT_TIME_AGO = new Date(Date.now() - 6 * 60 * 60 * 1000) // Change le 6 par le nombre d'heures souhaité
+    // ⏱️ 7️⃣ LOCK ANTI-SPAM CLIENT : Limite stricte à 1 scan toutes les 6 heures
+    const LIMIT_TIME_AGO = new Date(Date.now() - 6 * 60 * 60 * 1000)
 
     const recentCheckin = await prisma.checkin.findFirst({
       where: {
         loyaltyCardId: card.id,
         createdAt: {
-          gte: LIMIT_TIME_AGO // Cherche si un scan existe déjà dans cet intervalle de temps
+          gte: LIMIT_TIME_AGO
         }
       }
     })
@@ -99,7 +96,7 @@ const checkin = async (req, res) => {
       })
     }
 
-    // 8️⃣ 🛒 Création du check-in historique (Si non spammé)
+    // 8️⃣ 🛒 Validation finale : Création de la ligne d'historique (Checkin)
     await prisma.checkin.create({
       data: { 
         loyaltyCardId: card.id,
@@ -107,7 +104,7 @@ const checkin = async (req, res) => {
       }
     })
 
-    // Incrémentation des compteurs de la carte de fidélité
+    // Incrémentation des points sur la carte de fidélité
     const updatedCard = await prisma.loyaltyCard.update({
       where: { id: card.id },
       data: {
@@ -116,7 +113,7 @@ const checkin = async (req, res) => {
       }
     })
 
-    // 9️⃣ 🎁 Gestion de la récompense personnalisée (Custom Reward)
+    // 9️⃣ 🎁 Calcul et attribution de la récompense personnalisée si le palier est atteint
     let reward = null
     if (updatedCard.checkCount >= restaurant.checksRequired) {
       reward = await prisma.reward.create({
@@ -127,14 +124,14 @@ const checkin = async (req, res) => {
         }
       })
       
-      // Réinitialisation du compteur de la carte pour le prochain cycle
+      // Réinitialisation du compteur pour le prochain cycle de fidélité
       await prisma.loyaltyCard.update({
         where: { id: card.id },
         data: { checkCount: 0 }
       })
     }
 
-    // 🔟 🚀 Réponse HTTP propre
+    // 🔟 🚀 Réponse HTTP renvoyée au smartphone du client
     res.json({
       success: true,
       restaurant: restaurant.name,

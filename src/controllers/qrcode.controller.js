@@ -2,7 +2,7 @@ const prisma = require('../lib/prisma')
 const QRCode = require('qrcode')
 const jwt = require('jsonwebtoken')
 
-// 1️⃣ Le JWT contient maintenant l'ID unique de l'enregistrement QrCode (qrCodeId)
+// Génère le token JWT contenant l'ID unique du QR code en BDD
 const generateQrToken = (restaurantId, qrCodeId) => {
   return jwt.sign(
     { restaurantId, qrCodeId, type: 'qr_checkin' },
@@ -11,6 +11,7 @@ const generateQrToken = (restaurantId, qrCodeId) => {
   )
 }
 
+// Génère l'image en Base64 du QR Code
 const generateQrImage = async (token) => {
   const scanUrl = `https://fidapp-client.vercel.app/scan/${token}`
   return await QRCode.toDataURL(scanUrl, {
@@ -20,12 +21,11 @@ const generateQrImage = async (token) => {
   })
 }
 
-// 2️⃣ Force la génération d'un TOUT NOUVEAU flux/code (ex: clic sur rafraîchir)
+// Force la génération d'un TOUT NOUVEAU code (ex: clic sur rafraîchir manuellement)
 const generateQrCode = async (req, res) => {
   const restaurantId = req.restaurantId
 
   try {
-    // On crée l'entrée d'abord en BDD pour récupérer son ID unique
     const newQrRecord = await prisma.qrCode.create({
       data: { 
         restaurantId, 
@@ -38,7 +38,6 @@ const generateQrCode = async (req, res) => {
     const qrImage = await generateQrImage(token)
     const scanUrl = `https://fidapp-client.vercel.app/scan/${token}`
 
-    // Optionnel : on met à jour le champ 'code' avec le jeton pour le suivi
     await prisma.qrCode.update({
       where: { id: newQrRecord.id },
       data: { code: token }
@@ -50,12 +49,12 @@ const generateQrCode = async (req, res) => {
   }
 }
 
-// 3️⃣ Récupère le QR code actif actuel ou en génère un si expiré/consommé
+// Récupère le QR code actif actuel ou en génère un s'il a été consommé/expiré
 const getMyQrCodes = async (req, res) => {
   const restaurantId = req.restaurantId
 
   try {
-    // On cherche un QR code existant pour ce resto qui n'est PAS utilisé et qui a moins de 55 min
+    // On cherche un QR code existant qui n'est PAS encore utilisé et qui a moins de 55 min
     let activeQr = await prisma.qrCode.findFirst({
       where: {
         restaurantId,
@@ -68,7 +67,7 @@ const getMyQrCodes = async (req, res) => {
       orderBy: { createdAt: 'desc' }
     })
 
-    // Si aucun QR code n'est dispo (ex: utilisé ou expiré), on en génère un automatiquement
+    // Si aucun QR code n'est disponible, on en crée un nouveau automatiquement
     if (!activeQr) {
       activeQr = await prisma.qrCode.create({
         data: { 
@@ -84,7 +83,7 @@ const getMyQrCodes = async (req, res) => {
 
     res.json({
       qrCodes: [{
-        id: activeQr.id, // ID unique indispensable pour le polling Frontend !
+        id: activeQr.id, // ID unique indispensable pour le suivi et le polling
         code: token,
         isRotating: true,
         qrImage,
