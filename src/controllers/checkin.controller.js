@@ -80,7 +80,26 @@ const checkin = async (req, res) => {
       })
     }
 
-    // 7️⃣ 🛒 Création du check-in historique
+    // ⏱️ 7️⃣ LOCK ANTI-SPAM PAR CLIENT : Limite à 1 scan toutes les 6 heures
+    const LIMIT_TIME_AGO = new Date(Date.now() - 6 * 60 * 60 * 1000) // Change le 6 par le nombre d'heures souhaité
+
+    const recentCheckin = await prisma.checkin.findFirst({
+      where: {
+        loyaltyCardId: card.id,
+        createdAt: {
+          gte: LIMIT_TIME_AGO // Cherche si un scan existe déjà dans cet intervalle de temps
+        }
+      }
+    })
+
+    if (recentCheckin) {
+      return res.status(429).json({
+        error: 'limit_reached',
+        message: "Vous avez déjà validé une visite récemment dans cet établissement. Revenez lors de votre prochain repas !"
+      })
+    }
+
+    // 8️⃣ 🛒 Création du check-in historique (Si non spammé)
     await prisma.checkin.create({
       data: { 
         loyaltyCardId: card.id,
@@ -97,7 +116,7 @@ const checkin = async (req, res) => {
       }
     })
 
-    // 8️⃣ 🎁 Gestion de la récompense personnalisée (Custom Reward)
+    // 9️⃣ 🎁 Gestion de la récompense personnalisée (Custom Reward)
     let reward = null
     if (updatedCard.checkCount >= restaurant.checksRequired) {
       reward = await prisma.reward.create({
@@ -115,7 +134,7 @@ const checkin = async (req, res) => {
       })
     }
 
-    // 9️⃣ 🚀 Réponse HTTP propre
+    // 🔟 🚀 Réponse HTTP propre
     res.json({
       success: true,
       restaurant: restaurant.name,
