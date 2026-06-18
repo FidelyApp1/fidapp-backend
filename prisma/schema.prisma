@@ -81,11 +81,14 @@ model Reward {
 model QrCode {
   id           String     @id @default(uuid())
   restaurantId String
-  code         String     @unique @default(uuid())
+  code         String     @unique @default(uuid()) // Ce champ va contenir l'ID ou le token unique
   isRotating   Boolean    @default(false)
+  isUsed       Boolean    @default(false)       // ⚡ AJOUTE ÇA : Bloque la réutilisation après le 1er scan !
   createdAt    DateTime   @default(now())
 
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId, isUsed, createdAt]) // Optionnel mais recommandé pour les performances
 }
 
 model Admin {
