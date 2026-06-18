@@ -74,19 +74,50 @@ const getMe = async (req, res) => {
         email: true,
         phone: true,
         address: true,
+        sector: true,
         checksRequired: true,
         suspended: true,
+        rewardTitle: true,
+        rewardDesc: true,
+        rewardEmoji: true,
         createdAt: true
       }
     })
-    
     if (!restaurant) return res.status(404).json({ error: 'Restaurant introuvable' })
-    
     res.json({ restaurant })
   } catch (err) {
     res.status(500).json({ error: 'Erreur serveur', detail: err.message })
   }
 }
 
-// Un seul export propre en fin de fichier
-module.exports = { register, login, getMe }
+// 4️⃣ Mise à jour des paramètres du restaurant
+const updateSettings = async (req, res) => {
+  const { name, phone, address, sector, checksRequired, rewardTitle, rewardDesc, rewardEmoji } = req.body
+  
+  try {
+    const restaurant = await prisma.restaurant.update({
+      where: { id: req.restaurantId },
+      data: {
+        name, 
+        phone, 
+        address, 
+        sector,
+        checksRequired: checksRequired ? parseInt(checksRequired, 10) : undefined,
+        rewardTitle, 
+        rewardDesc, 
+        rewardEmoji
+      }
+    })
+    res.json({ restaurant })
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur serveur', detail: err.message })
+  }
+}
+
+// Un seul export propre pour tout le module 🚀
+module.exports = { 
+  register, 
+  login, 
+  getMe, 
+  updateSettings 
+}

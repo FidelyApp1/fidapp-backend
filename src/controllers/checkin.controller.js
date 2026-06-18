@@ -88,31 +88,39 @@ const checkin = async (req, res) => {
       }
     })
 
+    // 🎁 Gestion de la récompense personnalisée (Custom Reward)
     let reward = null
     if (updatedCard.checkCount >= restaurant.checksRequired) {
       reward = await prisma.reward.create({
         data: {
           loyaltyCardId: card.id,
-          type: 'FREE_MEAL',
-          description: 'Repas gratuit gagné !'
+          type: 'CUSTOM',
+          description: restaurant.rewardTitle
         }
       })
+      
+      // Réinitialisation du compteur de la carte
       await prisma.loyaltyCard.update({
         where: { id: card.id },
         data: { checkCount: 0 }
       })
     }
 
+    // 🚀 Réponse HTTP
     res.json({
       success: true,
       restaurant: restaurant.name,
+      rewardEmoji: restaurant.rewardEmoji,
+      rewardTitle: restaurant.rewardTitle,
+      rewardDesc: restaurant.rewardDesc,
       checkCount: reward ? 0 : updatedCard.checkCount,
       checksRequired: restaurant.checksRequired,
-      reward: reward ? reward.description : null,
+      reward: reward ? restaurant.rewardTitle : null,
       message: reward
-        ? `🎉 Félicitations ${user.name || ''} ! Vous avez gagné un repas gratuit !`
+        ? `${restaurant.rewardEmoji || '🎉'} ${restaurant.rewardTitle} !`
         : `Check-in #${updatedCard.checkCount}/${restaurant.checksRequired}`
     })
+    
   } catch (err) {
     res.status(500).json({ error: 'Erreur serveur', detail: err.message })
   }
