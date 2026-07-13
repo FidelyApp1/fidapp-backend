@@ -25,8 +25,6 @@ const checkin = async (req, res) => {
     const qrCodeId = decoded.qrCodeId 
 
     // 2️⃣ et 3️⃣ 🛡️ OPÉRATION ATOMIQUE ANTI-FRAUDE (Screenshot & Double Validation simultanée)
-    // On essaie de passer 'isUsed' à true SEULEMENT s'il était à false. 
-    // S'il a déjà été validé par quelqu'un d'autre, le count vaudra 0.
     const updatedQr = await prisma.qrCode.updateMany({
       where: {
         id: qrCodeId,
@@ -44,7 +42,7 @@ const checkin = async (req, res) => {
       })
     }
 
-    // 4️⃣ Vérifications de l'état du restaurant
+    // 4️⃣ Vérifications de l'état du restaurant & Récupération de son délai personnalisé
     const restaurant = await prisma.restaurant.findUnique({
       where: { id: restaurantId }
     })
@@ -57,13 +55,38 @@ const checkin = async (req, res) => {
       return res.status(403).json({ error: 'Ce restaurant est suspendu' })
     }
 
-    // 5️⃣ 👤 Gestion du profil de l'utilisateur (Création ou Mise à jour du prénom)
+    // 👤 Récupération ou création de l'utilisateur pour vérifier l'anti-spam au plus tôt
     let user = await prisma.user.findUnique({ where: { phone } })
     
     if (!user) {
       user = await prisma.user.create({ data: { phone, name: name || null } })
     } else if (name && !user.name) {
       user = await prisma.user.update({ where: { phone }, data: { name } })
+    }
+
+    // ⏱️ 5️⃣ LOCK ANTI-SPAM DYNAMIQUE : Récupération du délai paramétré par le restaurant
+    // Utilise la valeur du dashboard, ou 6 heures par défaut si non définie
+    const delayHours = restaurant.scanDelayHours !== undefined ? restaurant.scanDelayHours : 6
+    const LIMIT_TIME_AGO = new Date(Date.now() - delayHours * 60 * 60 * 1000)
+
+    // Vérification de l'existence d'un scan récent pour cet utilisateur dans CE restaurant
+    const recentCheckin = await prisma.checkin.findFirst({
+      where: {
+        loyaltyCard: {
+          userId: user.id,
+          restaurantId: restaurantId
+        },
+        createdAt: {
+          gte: LIMIT_TIME_AGO
+        }
+      }
+    })
+
+    if (recentCheckin) {
+      return res.status(429).json({
+        error: 'limit_reached',
+        message: `Vous avez déjà validé une visite récemment dans cet établissement. Veuillez attendre ${delayHours}h entre chaque repas !`
+      })
     }
 
     // 6️⃣ Récupération ou création de la carte de fidélité pour ce restaurant
@@ -77,26 +100,7 @@ const checkin = async (req, res) => {
       })
     }
 
-    // ⏱️ 7️⃣ LOCK ANTI-SPAM CLIENT : Limite stricte à 1 scan toutes les 6 heures
-    const LIMIT_TIME_AGO = new Date(Date.now() - 6 * 60 * 60 * 1000)
-
-    const recentCheckin = await prisma.checkin.findFirst({
-      where: {
-        loyaltyCardId: card.id,
-        createdAt: {
-          gte: LIMIT_TIME_AGO
-        }
-      }
-    })
-
-    if (recentCheckin) {
-      return res.status(429).json({
-        error: 'limit_reached',
-        message: "Vous avez déjà validé une visite récemment dans cet établissement. Revenez lors de votre prochain repas !"
-      })
-    }
-
-    // 8️⃣ 🛒 Validation finale : Création de la ligne d'historique (Checkin)
+    // 7️⃣ 🛒 Validation finale : Création de la ligne d'historique (Checkin)
     await prisma.checkin.create({
       data: { 
         loyaltyCardId: card.id,
@@ -113,7 +117,7 @@ const checkin = async (req, res) => {
       }
     })
 
-    // 9️⃣ 🎁 Calcul et attribution de la récompense personnalisée si le palier est atteint
+    // 8️⃣ 🎁 Calcul et attribution de la récompense personnalisée si le palier est atteint
     let reward = null
     if (updatedCard.checkCount >= restaurant.checksRequired) {
       reward = await prisma.reward.create({
@@ -131,7 +135,7 @@ const checkin = async (req, res) => {
       })
     }
 
-    // 🔟 🚀 Réponse HTTP renvoyée au smartphone du client
+    // 9️⃣ 🚀 Réponse HTTP renvoyée au smartphone du client
     res.json({
       success: true,
       restaurant: restaurant.name,

@@ -18,6 +18,7 @@ model Restaurant {
   logoUrl        String?
   sector         String   @default("restaurant")
   checksRequired Int      @default(10)
+  scanDelayHours Int      @default(6) // ⏱️ Ajoute cette ligne pour stocker le choix
   suspended      Boolean  @default(false)
   rewardTitle    String   @default("Repas gratuit")
   rewardDesc     String   @default("Votre prochain repas est offert !")
