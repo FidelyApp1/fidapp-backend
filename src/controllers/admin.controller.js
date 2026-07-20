@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const prisma = require('../lib/prisma')
+const { RESTAURANT_PUBLIC_SELECT } = require('../lib/restaurantSelect')
 
 const adminLogin = async (req, res) => {
   const { email, password } = req.body
@@ -75,7 +76,8 @@ const getRestaurants = async (req, res) => {
   try {
     const restaurants = await prisma.restaurant.findMany({
       orderBy: { createdAt: 'desc' },
-      include: {
+      select: {
+        ...RESTAURANT_PUBLIC_SELECT,
         _count: { select: { loyaltyCards: true, qrCodes: true } }
       }
     })
@@ -92,7 +94,8 @@ const createRestaurant = async (req, res) => {
     if (existing) return res.status(400).json({ error: 'Email déjà utilisé' })
     const hashedPassword = await bcrypt.hash(password, 10)
     const restaurant = await prisma.restaurant.create({
-      data: { name, email, password: hashedPassword, phone, address, checksRequired: checksRequired || 10 }
+      data: { name, email, password: hashedPassword, phone, address, checksRequired: checksRequired || 10 },
+      select: RESTAURANT_PUBLIC_SELECT
     })
     res.status(201).json({ restaurant })
   } catch (err) {
@@ -106,7 +109,8 @@ const updateRestaurant = async (req, res) => {
   try {
     const restaurant = await prisma.restaurant.update({
       where: { id },
-      data: { name, phone, address, checksRequired, suspended, email }
+      data: { name, phone, address, checksRequired, suspended, email },
+      select: RESTAURANT_PUBLIC_SELECT
     })
     res.json({ restaurant })
   } catch (err) {
@@ -144,7 +148,10 @@ const getRestaurantStats = async (req, res) => {
   try {
     const restaurant = await prisma.restaurant.findUnique({
       where: { id },
-      include: { _count: { select: { loyaltyCards: true, qrCodes: true } } }
+      select: {
+        ...RESTAURANT_PUBLIC_SELECT,
+        _count: { select: { loyaltyCards: true, qrCodes: true } }
+      }
     })
     const totalCheckins = await prisma.checkin.count({ where: { loyaltyCard: { restaurantId: id } } })
     const totalRewards = await prisma.reward.count({ where: { loyaltyCard: { restaurantId: id } } })

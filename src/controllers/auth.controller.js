@@ -1,9 +1,18 @@
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const prisma = require('../lib/prisma')
+const config = require('../lib/config')
+const { RESTAURANT_PUBLIC_SELECT } = require('../lib/restaurantSelect')
 
-// 1️⃣ Inscription d'un nouveau restaurant
+// 1️⃣ Inscription d'un nouveau restaurant (désactivée par défaut)
 const register = async (req, res) => {
+  if (!config.allowPublicRegister) {
+    return res.status(403).json({
+      error: 'register_closed',
+      message: 'Inscription fermée — contactez FidApp pour créer votre compte.'
+    })
+  }
+
   const { name, email, password, phone, address } = req.body
 
   try {
@@ -48,6 +57,10 @@ const login = async (req, res) => {
       return res.status(401).json({ error: 'Mot de passe incorrect' })
     }
 
+    if (restaurant.suspended) {
+      return res.status(403).json({ error: 'Compte suspendu — contactez FidApp.' })
+    }
+
     const token = jwt.sign(
       { restaurantId: restaurant.id },
       process.env.JWT_SECRET,
@@ -68,20 +81,7 @@ const getMe = async (req, res) => {
   try {
     const restaurant = await prisma.restaurant.findUnique({
       where: { id: req.restaurantId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        address: true,
-        sector: true,
-        checksRequired: true,
-        suspended: true,
-        rewardTitle: true,
-        rewardDesc: true,
-        rewardEmoji: true,
-        createdAt: true
-      }
+      select: RESTAURANT_PUBLIC_SELECT
     })
     if (!restaurant) return res.status(404).json({ error: 'Restaurant introuvable' })
     res.json({ restaurant })
@@ -92,7 +92,7 @@ const getMe = async (req, res) => {
 
 // 4️⃣ Mise à jour des paramètres du restaurant
 const updateSettings = async (req, res) => {
-  const { name, phone, address, sector, checksRequired, rewardTitle, rewardDesc, rewardEmoji } = req.body
+  const { name, phone, address, sector, checksRequired, scanDelayHours, rewardTitle, rewardDesc, rewardEmoji } = req.body
   
   try {
     const restaurant = await prisma.restaurant.update({
@@ -102,11 +102,13 @@ const updateSettings = async (req, res) => {
         phone, 
         address, 
         sector,
-        checksRequired: checksRequired ? parseInt(checksRequired, 10) : undefined,
+        checksRequired,
+        scanDelayHours,
         rewardTitle, 
         rewardDesc, 
         rewardEmoji
-      }
+      },
+      select: RESTAURANT_PUBLIC_SELECT
     })
     res.json({ restaurant })
   } catch (err) {

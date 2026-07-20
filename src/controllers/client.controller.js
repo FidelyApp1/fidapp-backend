@@ -1,7 +1,7 @@
 const prisma = require('../lib/prisma')
 
 const getClientProfile = async (req, res) => {
-  const { phone } = req.params
+  const phone = req.clientPhone
 
   try {
     const user = await prisma.user.findUnique({
@@ -9,7 +9,15 @@ const getClientProfile = async (req, res) => {
       include: {
         loyaltyCards: {
           include: {
-            restaurant: true,
+            restaurant: {
+              select: {
+                id: true,
+                name: true,
+                checksRequired: true,
+                rewardTitle: true,
+                rewardEmoji: true
+              }
+            },
             rewards: {
               orderBy: { createdAt: 'desc' }
             },
@@ -36,7 +44,7 @@ const getClientProfile = async (req, res) => {
 
     res.json({ user, totalCheckins, totalRewards })
   } catch (err) {
-    res.status(500).json({ error: 'Erreur serveur', detail: err.message })
+    res.status(500).json({ error: 'Erreur serveur' })
   }
 }
 

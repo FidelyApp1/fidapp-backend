@@ -1,4 +1,5 @@
 const express = require('express')
+const { strictLimiter } = require('../lib/rateLimiters')
 const {
   adminLogin, getGlobalStats, getRestaurants, createRestaurant,
   updateRestaurant, resetPassword, deleteRestaurant, getRestaurantStats,
@@ -8,7 +9,7 @@ const adminMiddleware = require('../middleware/admin.middleware')
 
 const router = express.Router()
 
-router.post('/login', adminLogin)
+router.post('/login', strictLimiter, adminLogin)
 router.get('/stats', adminMiddleware, getGlobalStats)
 router.get('/restaurants', adminMiddleware, getRestaurants)
 router.post('/restaurants', adminMiddleware, createRestaurant)

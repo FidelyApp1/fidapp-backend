@@ -4,7 +4,9 @@
    "main": "index.js",
    "scripts": {
       "dev": "nodemon src/index.js",
-      "start": "node src/index.js"
+      "start": "node src/index.js",
+      "db:push": "prisma db push",
+      "db:generate": "prisma generate"
    },
    "repository": {
       "type": "git",

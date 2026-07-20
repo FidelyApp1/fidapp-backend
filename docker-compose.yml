@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fidapp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: fidapp
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U fidapp']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://fidapp:${POSTGRES_PASSWORD:-changeme}@db:5432/fidapp
+      DIRECT_URL: postgresql://fidapp:${POSTGRES_PASSWORD:-changeme}@db:5432/fidapp
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
